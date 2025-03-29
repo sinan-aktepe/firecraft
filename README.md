@@ -17,7 +17,7 @@ Add this to your package's `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  firecraft: ^0.1.0+1
+  firecraft: ^0.1.2
 ```
 
 ## Basic Usage

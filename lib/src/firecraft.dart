@@ -30,6 +30,13 @@ import 'package:firecraft/src/model/paginated_result.dart';
 /// });
 /// ```
 class Firecraft {
+  Firecraft._();
+
+  static final Firecraft _instance = Firecraft._();
+
+  /// Static instance of firecraft class
+  static Firecraft get instance => _instance;
+  
   /// Creates a new instance of [Firecraft] with the default Firestore instance.
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 

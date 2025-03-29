@@ -1,3 +1,7 @@
+## 0.1.2
+
+- Firecraft class is now singleton
+
 ## 0.1.1
 
 - Removed flutter dependency

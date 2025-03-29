@@ -2,3 +2,4 @@
 library;
 
 export 'src/firecraft.dart';
+export 'src/model/paginated_result.dart';
