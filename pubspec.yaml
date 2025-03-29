@@ -1,6 +1,6 @@
 name: firecraft
 description: A simplified and intuitive wrapper for Cloud Firestore operations in Flutter applications.
-version: 0.1.2
+version: 0.1.2+1
 repository: https://github.com/sinan-aktepe/firecraft
 homepage: https://github.com/sinan-aktepe/firecraft
 topics: [firestore, firebase]

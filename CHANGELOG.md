@@ -1,3 +1,7 @@
+## 0.1.2+1
+
+- Updated README.md
+
 ## 0.1.2
 
 - Firecraft class is now singleton

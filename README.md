@@ -17,7 +17,7 @@ Add this to your package's `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  firecraft: ^0.1.2
+  firecraft: ^0.1.2+1
 ```
 
 ## Basic Usage
@@ -25,7 +25,7 @@ dependencies:
 ### Initialize Firecraft
 
 ```dart
-final firecraft = Firecraft();
+final firecraft = Firecraft.instance;
 ```
 
 ### Fetch Collection Data
