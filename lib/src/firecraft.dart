@@ -1,9 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firecraft/src/model/paginated_result.dart';
 
-/// A utility class that provides a simplified interface for interacting with Cloud Firestore.
+/// JSON-shaped map used throughout the Firestore API.
+typedef Json = Map<String, dynamic>;
+
+/// Converts raw Firestore document data into a typed model.
+typedef FromJson<T> = T Function(Json json);
+
+/// Builds a [Query] from a [CollectionReference].
+typedef QueryBuilder = Query<Json> Function(CollectionReference<Json>);
+
+/// A utility class that provides a simplified interface for interacting with
+/// Cloud Firestore.
 ///
-/// The Firecraft class encapsulates common Firestore operations and provides methods for:
+/// The Firecraft class encapsulates common Firestore operations and provides
+/// methods for:
 /// * Fetching documents and collections
 /// * Streaming document and collection changes
 /// * Adding, updating, and deleting documents
@@ -13,7 +24,7 @@ import 'package:firecraft/src/model/paginated_result.dart';
 ///
 /// Example usage:
 /// ```dart
-/// final firecraft = Firecraft();
+/// final firecraft = Firecraft.instance;
 ///
 /// // Fetch a collection
 /// final users = await firecraft.fetchCollection(
@@ -36,9 +47,14 @@ class Firecraft {
 
   /// Static instance of firecraft class
   static Firecraft get instance => _instance;
-  
-  /// Creates a new instance of [Firecraft] with the default Firestore instance.
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  /// Reads a [DocumentSnapshot]'s data, injects its id, and decodes it.
+  T _decode<T>(QueryDocumentSnapshot<Json> doc, FromJson<T> fromJson) {
+    final data = doc.data()..['id'] = doc.id;
+    return fromJson(data);
+  }
 
   /// Fetches a list of documents from a collection.
   ///
@@ -52,26 +68,21 @@ class Firecraft {
   /// Throws [FirebaseException] if the operation fails.
   Future<List<T>> fetchCollection<T>({
     required String collectionPath,
-    required T Function(Map<String, dynamic> json) fromJson,
-    Query<Map<String, dynamic>> Function(CollectionReference<Map<String, dynamic>> query)? queryBuilder,
+    required FromJson<T> fromJson,
+    QueryBuilder? queryBuilder,
     int? limit,
   }) async {
     try {
       final collectionRef = _firestore.collection(collectionPath);
-
-      var query = queryBuilder != null ? queryBuilder(collectionRef) : collectionRef;
+      var query =
+          queryBuilder != null ? queryBuilder(collectionRef) : collectionRef;
 
       if (limit != null) {
         query = query.limit(limit);
       }
 
       final querySnapshot = await query.get();
-
-      return querySnapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return fromJson(data);
-      }).toList();
+      return querySnapshot.docs.map((doc) => _decode(doc, fromJson)).toList();
     } on FirebaseException catch (_) {
       rethrow;
     }
@@ -87,7 +98,7 @@ class Firecraft {
   /// Throws [FirebaseException] if the operation fails.
   Future<T?> fetchDocument<T>({
     required String documentPath,
-    required T Function(Map<String, dynamic> json) fromJson,
+    required FromJson<T> fromJson,
   }) async {
     try {
       final docSnapshot = await _firestore.doc(documentPath).get();
@@ -96,8 +107,7 @@ class Firecraft {
         return null;
       }
 
-      final data = docSnapshot.data()!;
-      data['id'] = docSnapshot.id;
+      final data = docSnapshot.data()!..['id'] = docSnapshot.id;
       return fromJson(data);
     } on FirebaseException catch (_) {
       rethrow;
@@ -114,7 +124,7 @@ class Firecraft {
   /// Throws [FirebaseException] if the operation fails.
   Future<DocumentReference> addDocument({
     required String collectionPath,
-    required Map<String, dynamic> data,
+    required Json data,
   }) async {
     try {
       return await _firestore.collection(collectionPath).add(data);
@@ -134,7 +144,7 @@ class Firecraft {
   Future<void> setDocument({
     required String collectionPath,
     required String docId,
-    Map<String, dynamic> data = const <String, dynamic>{},
+    Json data = const <String, dynamic>{},
   }) async {
     try {
       await _firestore.collection(collectionPath).doc(docId).set(data);
@@ -152,7 +162,7 @@ class Firecraft {
   /// Throws [FirebaseException] if the operation fails.
   Future<void> updateDocument({
     required String documentPath,
-    required Map<String, dynamic> data,
+    required Json data,
   }) async {
     try {
       await _firestore.doc(documentPath).update(data);
@@ -187,7 +197,7 @@ class Firecraft {
   /// Throws [FirebaseException] if the operation fails.
   Stream<T?> streamDocument<T>({
     required String documentPath,
-    required T Function(Map<String, dynamic> json) fromJson,
+    required FromJson<T> fromJson,
   }) {
     try {
       return _firestore.doc(documentPath).snapshots().map((snapshot) {
@@ -195,8 +205,7 @@ class Firecraft {
           return null;
         }
 
-        final data = snapshot.data()!;
-        data['id'] = snapshot.id;
+        final data = snapshot.data()!..['id'] = snapshot.id;
         return fromJson(data);
       });
     } on FirebaseException catch (_) {
@@ -238,14 +247,14 @@ class Firecraft {
   ///
   /// Returns a [Stream] of [QuerySnapshot].
   /// Throws [FirebaseException] if the operation fails.
-  Stream<QuerySnapshot<Map<String, dynamic>>> getSnapshots({
+  Stream<QuerySnapshot<Json>> getSnapshots({
     required String collectionPath,
-    Query<Map<String, dynamic>> Function(CollectionReference<Map<String, dynamic>> query)? queryBuilder,
+    QueryBuilder? queryBuilder,
   }) {
     try {
       final collectionRef = _firestore.collection(collectionPath);
-      final query = queryBuilder != null ? queryBuilder(collectionRef) : collectionRef;
-
+      final query =
+          queryBuilder != null ? queryBuilder(collectionRef) : collectionRef;
       return query.snapshots();
     } on FirebaseException catch (_) {
       rethrow;
@@ -263,20 +272,18 @@ class Firecraft {
   /// Throws [FirebaseException] if the operation fails.
   Stream<List<T>> streamCollection<T>({
     required String collectionPath,
-    required T Function(Map<String, dynamic> json) fromJson,
-    Query<Map<String, dynamic>> Function(CollectionReference<Map<String, dynamic>> query)? queryBuilder,
+    required FromJson<T> fromJson,
+    QueryBuilder? queryBuilder,
   }) {
     try {
       final collectionRef = _firestore.collection(collectionPath);
-      final query = queryBuilder != null ? queryBuilder(collectionRef) : collectionRef;
+      final query =
+          queryBuilder != null ? queryBuilder(collectionRef) : collectionRef;
 
-      return query.snapshots().map((snapshot) {
-        return snapshot.docs.map((doc) {
-          final data = doc.data();
-          data['id'] = doc.id;
-          return fromJson(data);
-        }).toList();
-      });
+      return query.snapshots().map(
+            (snapshot) =>
+                snapshot.docs.map((doc) => _decode(doc, fromJson)).toList(),
+          );
     } on FirebaseException catch (_) {
       rethrow;
     }
@@ -298,40 +305,29 @@ class Firecraft {
     required String collectionPath,
     required String fieldToUpdate,
     required dynamic newValue,
-    required bool Function(Map<String, dynamic> data) condition,
-    Query<Map<String, dynamic>> Function(CollectionReference<Map<String, dynamic>> query)? queryBuilder,
+    required bool Function(Json data) condition,
+    QueryBuilder? queryBuilder,
     int batchSize = 500, // Firestore limit is 500 writes per batch
   }) async {
     try {
-      int updatedCount = 0;
+      final collectionRef = _firestore.collection(collectionPath);
+      final query =
+          queryBuilder != null ? queryBuilder(collectionRef) : collectionRef;
 
-      // Get collection reference
-      CollectionReference<Map<String, dynamic>> collectionRef = _firestore.collection(collectionPath);
-
-      // Apply initial query if provided
-      Query<Map<String, dynamic>> query = queryBuilder != null ? queryBuilder(collectionRef) : collectionRef;
-
-      // Get all documents that need to be updated
-      QuerySnapshot<Map<String, dynamic>> snapshot = await query.get();
-
-      // Filter documents based on condition
-      List<DocumentSnapshot<Map<String, dynamic>>> docsToUpdate =
+      final snapshot = await query.get();
+      final docsToUpdate =
           snapshot.docs.where((doc) => condition(doc.data())).toList();
 
-      // Process in batches
+      var updatedCount = 0;
       for (var i = 0; i < docsToUpdate.length; i += batchSize) {
-        WriteBatch batch = _firestore.batch();
+        final batch = _firestore.batch();
+        final currentBatch = docsToUpdate.skip(i).take(batchSize);
 
-        // Get current batch of documents
-        var currentBatch = docsToUpdate.skip(i).take(batchSize);
-
-        // Add update operations to batch
-        for (var doc in currentBatch) {
+        for (final doc in currentBatch) {
           batch.update(doc.reference, {fieldToUpdate: newValue});
           updatedCount++;
         }
 
-        // Commit batch
         await batch.commit();
       }
 
@@ -354,45 +350,26 @@ class Firecraft {
   /// Throws [FirebaseException] if the operation fails.
   Stream<PaginatedResult<T>> paginatedCollection<T>({
     required String collectionPath,
-    required T Function(Map<String, dynamic> json) fromJson,
-    Query<Map<String, dynamic>> Function(CollectionReference<Map<String, dynamic>> query)? queryBuilder,
+    required FromJson<T> fromJson,
+    QueryBuilder? queryBuilder,
     DocumentSnapshot? startAfter,
     int limit = 20,
   }) {
     try {
-      // Start with the collection reference
-      CollectionReference<Map<String, dynamic>> collectionRef = _firestore.collection(collectionPath);
+      final collectionRef = _firestore.collection(collectionPath);
+      var query =
+          queryBuilder != null ? queryBuilder(collectionRef) : collectionRef;
 
-      // Apply custom query if provided
-      Query<Map<String, dynamic>> query = queryBuilder != null ? queryBuilder(collectionRef) : collectionRef;
-
-      // Apply pagination
       if (startAfter != null) {
         query = query.startAfterDocument(startAfter);
       }
 
-      // Apply limit
-      query = query.limit(limit + 1); // Get one extra to check if there's more
+      // Get one extra to check if there's more.
+      query = query.limit(limit + 1);
 
-      return query.snapshots().map((snapshot) {
-        final docs = snapshot.docs;
-
-        // Check if there are more documents
-        bool hasMore = docs.length > limit;
-
-        // Remove the extra document if exists
-        final items = docs.take(limit).map((doc) {
-          final data = doc.data();
-          data['id'] = doc.id;
-          return fromJson(data);
-        }).toList();
-
-        return PaginatedResult<T>(
-          items: items,
-          lastDocument: docs.isNotEmpty ? docs[docs.length - 1] : null,
-          hasMore: hasMore,
-        );
-      });
+      return query.snapshots().map(
+            (snapshot) => _toPaginatedResult(snapshot.docs, fromJson, limit),
+          );
     } on FirebaseException catch (_) {
       rethrow;
     }
@@ -410,31 +387,17 @@ class Firecraft {
   /// Throws [FirebaseException] if the operation fails.
   Future<PaginatedResult<T>> fetchInitialPage<T>({
     required String collectionPath,
-    required T Function(Map<String, dynamic> json) fromJson,
-    Query<Map<String, dynamic>> Function(CollectionReference<Map<String, dynamic>> query)? queryBuilder,
+    required FromJson<T> fromJson,
+    QueryBuilder? queryBuilder,
     int limit = 20,
   }) async {
     try {
-      final query = queryBuilder != null
-          ? queryBuilder(_firestore.collection(collectionPath))
-          : _firestore.collection(collectionPath);
+      final collectionRef = _firestore.collection(collectionPath);
+      final query =
+          queryBuilder != null ? queryBuilder(collectionRef) : collectionRef;
 
       final snapshots = await query.limit(limit + 1).get();
-      final docs = snapshots.docs;
-
-      final hasMore = docs.length > limit;
-
-      final items = docs.take(limit).map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return fromJson(data);
-      }).toList();
-
-      return PaginatedResult<T>(
-        items: items,
-        lastDocument: docs.isNotEmpty ? docs[docs.length - 1] : null,
-        hasMore: hasMore,
-      );
+      return _toPaginatedResult(snapshots.docs, fromJson, limit);
     } on FirebaseException catch (_) {
       rethrow;
     }
@@ -453,34 +416,19 @@ class Firecraft {
   /// Throws [FirebaseException] if the operation fails.
   Future<PaginatedResult<T>> fetchNextPage<T>({
     required String collectionPath,
-    required T Function(Map<String, dynamic> json) fromJson,
+    required FromJson<T> fromJson,
     required DocumentSnapshot lastDocument,
-    Query<Map<String, dynamic>> Function(CollectionReference<Map<String, dynamic>> query)? queryBuilder,
+    QueryBuilder? queryBuilder,
     int limit = 20,
   }) async {
     try {
-      var query = queryBuilder != null
-          ? queryBuilder(_firestore.collection(collectionPath))
-          : _firestore.collection(collectionPath);
-
-      query = query.startAfterDocument(lastDocument).limit(limit + 1);
+      final collectionRef = _firestore.collection(collectionPath);
+      final base =
+          queryBuilder != null ? queryBuilder(collectionRef) : collectionRef;
+      final query = base.startAfterDocument(lastDocument).limit(limit + 1);
 
       final snapshots = await query.get();
-      final docs = snapshots.docs;
-
-      final hasMore = docs.length > limit;
-
-      final items = docs.take(limit).map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return fromJson(data);
-      }).toList();
-
-      return PaginatedResult<T>(
-        items: items,
-        lastDocument: docs.isNotEmpty ? docs[docs.length - 1] : null,
-        hasMore: hasMore,
-      );
+      return _toPaginatedResult(snapshots.docs, fromJson, limit);
     } on FirebaseException catch (_) {
       rethrow;
     }
@@ -497,23 +445,41 @@ class Firecraft {
   /// Throws [FirebaseException] if the operation fails.
   Stream<int> streamDocumentCount({
     required String collectionPath,
-    Query<Map<String, dynamic>> Function(CollectionReference<Map<String, dynamic>> query)? queryBuilder,
-    bool Function(Map<String, dynamic> data)? additionalCondition,
+    QueryBuilder? queryBuilder,
+    bool Function(Json data)? additionalCondition,
   }) {
     try {
       final collectionRef = _firestore.collection(collectionPath);
-
-      final query = queryBuilder != null ? queryBuilder(collectionRef) : collectionRef;
+      final query =
+          queryBuilder != null ? queryBuilder(collectionRef) : collectionRef;
 
       if (additionalCondition == null) {
         return query.snapshots().map((snapshot) => snapshot.size);
       }
 
-      return query.snapshots().map((snapshot) {
-        return snapshot.docs.where((doc) => additionalCondition(doc.data())).length;
-      });
+      return query.snapshots().map(
+            (snapshot) => snapshot.docs
+                .where((doc) => additionalCondition(doc.data()))
+                .length,
+          );
     } on FirebaseException catch (_) {
       rethrow;
     }
+  }
+
+  PaginatedResult<T> _toPaginatedResult<T>(
+    List<QueryDocumentSnapshot<Json>> docs,
+    FromJson<T> fromJson,
+    int limit,
+  ) {
+    final hasMore = docs.length > limit;
+    final items =
+        docs.take(limit).map((doc) => _decode(doc, fromJson)).toList();
+
+    return PaginatedResult<T>(
+      items: items,
+      lastDocument: docs.isNotEmpty ? docs.last : null,
+      hasMore: hasMore,
+    );
   }
 }

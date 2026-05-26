@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// A generic class that represents a paginated result set from Firestore queries.
+/// A generic class that represents a paginated result set from Firestore
+/// queries.
 ///
 /// The [PaginatedResult] class encapsulates the data and metadata necessary for
 /// implementing pagination in Firestore queries. It holds:
@@ -39,7 +40,8 @@ class PaginatedResult<T> {
   /// Parameters:
   /// * [items] - The list of items in the current page
   /// * [hasMore] - Whether there are more items available to fetch
-  /// * [lastDocument] - The last document in the current page, used for fetching the next page
+  /// * [lastDocument] - The last document in the current page, used for
+  ///   fetching the next page
   PaginatedResult({
     required this.items,
     required this.hasMore,
